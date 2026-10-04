@@ -1,4 +1,4 @@
-# Demand Forecasting Platform
+# AI-Powered Demand Forecasting & Inventory Optimization Platform
 
 A practical demand forecasting portfolio app with a FastAPI backend, time-aware model comparison, model versioning, a React dashboard, and optional PostgreSQL storage.
 
