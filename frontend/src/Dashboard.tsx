@@ -76,6 +76,12 @@ export default function Dashboard() {
   const [busy, setBusy] = useState(false);
 
   const [forecast, setForecast] = useState<number | null>(null);
+
+  const [dailyForecasts, setDailyForecasts] = useState<
+    { date: string; predicted_sales: number }[]
+  >([]);
+  const [totalDemand, setTotalDemand] = useState<number | null>(null);
+
   const [currentStock, setCurrentStock] = useState("450");
   const [leadTime, setLeadTime] = useState("7");
   const [demandStd, setDemandStd] = useState("10");
@@ -336,49 +342,49 @@ export default function Dashboard() {
         },
         body: JSON.stringify({
           version: latestVersion.version,
-          features: [
-            {
-              day: 15,
-              month: 3,
-              quarter: 1,
-              day_of_week: 2,
-              week_of_year: 11,
-              is_weekend: 0,
-              lag_1: 120,
-              lag_7: 115,
-              lag_14: 118,
-              lag_30: 110,
-              rolling_mean_7: 117,
-              rolling_mean_14: 116,
-              rolling_mean_30: 113,
-              price: 100,
-              discount: 5,
-              promotion: 1,
-              category: 1,
-              region: 1,
-              supplier: 1,
-              lead_time: 7,
-            },
-          ],
+          horizon_days: 7,
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        setMessage(JSON.stringify(data.detail));
+        setMessage(
+          typeof data.detail === "string"
+            ? data.detail
+            : JSON.stringify(data.detail ?? data)
+        );
         return;
       }
 
-      const value =
-        data.forecast ??
-data.prediction ??
-data.forecasts?.[0] ??
-data.predictions?.[0] ??
-null;
+      const daily = Array.isArray(data.daily_forecasts)
+        ? data.daily_forecasts.filter(
+            (item: { date?: unknown; predicted_sales?: unknown }) =>
+              typeof item.date === "string" &&
+              typeof item.predicted_sales === "number"
+          )
+        : [];
 
-      setForecast(typeof value === "number" ? value : null);
-      setMessage("Forecast generated successfully.");
+      if (daily.length === 0) {
+        setForecast(null);
+        setDailyForecasts([]);
+        setTotalDemand(null);
+        setMessage("No daily predictions were returned by the API.");
+        return;
+      }
+
+      setDailyForecasts(daily);
+      setTotalDemand(
+        typeof data.total_demand === "number"
+          ? data.total_demand
+          : daily.reduce(
+              (sum: number, item: { predicted_sales: number }) =>
+                sum + item.predicted_sales,
+              0
+            )
+      );
+      setForecast(daily[0].predicted_sales);
+      setMessage("7-day forecast generated successfully.");
       setActive("forecast");
     } catch {
       setMessage("Forecast request failed.");
@@ -986,6 +992,30 @@ null;
               >
                 {busy ? "Generating..." : "Generate forecast →"}
               </button>
+
+              {dailyForecasts.length > 0 && (
+                <div className="forecast-results">
+                  <h3>7-Day Forecast</h3>
+                  <p className="panel-description">
+                    Total predicted demand:{" "}
+                    <strong>{formatNumber(totalDemand ?? undefined, 1)}</strong>{" "}
+                    units
+                  </p>
+
+                  <div className="table-container">
+                    <div className="table-row">
+                      <strong>Date</strong>
+                      <strong>Predicted sales</strong>
+                    </div>
+                    {dailyForecasts.map((item) => (
+                      <div className="table-row" key={item.date}>
+                        <span>{item.date}</span>
+                        <strong>{formatNumber(item.predicted_sales, 1)}</strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </article>
 
             <article className="panel-card">
